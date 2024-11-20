@@ -70,6 +70,8 @@ def transform(ti):
         direction="backward"  # Ensures we match the latest 'time' <= 'timestamp'
     )
 
+    transformed_df = transformed_df.drop(columns=["time"])
+
     #Fix Data Types
     transformed_df['zip_code'] = transformed_df['zip_code'].fillna(0).astype(int).astype(str).str.zfill(5).replace("00000", "Other")
 
@@ -108,13 +110,13 @@ with DAG(
     default_args={'retries': 1},
     description='An ETL pipeline for crash and weather data',
     schedule_interval='@daily',
-    start_date=datetime(2024, 11, 13),
+    start_date=datetime(2024, 10, 20),
     catchup=True,
 ) as dag:
     extract_task = PythonOperator(
         task_id='extract_data',
         python_callable=extract,
-         op_kwargs={
+        op_kwargs={
             # Use Airflow's Jinja templating for ds (execution date) and calculate 7 days prior
             "extraction_date": "{{ (execution_date - macros.timedelta(days=7)).strftime('%Y-%m-%d') }}",
         },
