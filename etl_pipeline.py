@@ -39,7 +39,6 @@ def transform(ti):
     selected_columns = ["borough", "zip_code", "latitude", "longitude", "number_of_persons_injured", "number_of_persons_killed", "contributing_factor_vehicle_1", "contributing_factor_vehicle_2", "vehicle_type_code1", "vehicle_type_code2", "cross_street_name"]
     cleaned_crash_df = crash_df.loc[:, selected_columns]
     cleaned_crash_df["timestamp"] = pd.to_datetime(crash_df["crash_date"]) + pd.to_timedelta(crash_df["crash_time"] + ":00")
-    cleaned_crash_df = cleaned_crash_df.replace(["Unspecified", "UNKNOWN", "NaN"], np.nan)
 
     numeric_columns = ["latitude", "longitude", "number_of_persons_injured", "number_of_persons_killed"]
     cleaned_crash_df[numeric_columns] = cleaned_crash_df[numeric_columns].apply(pd.to_numeric, errors='coerce')
@@ -53,6 +52,15 @@ def transform(ti):
         right_on="time",
         direction="backward"  # Ensures we match the latest 'time' <= 'timestamp'
     )
+
+    #Fix Data Types
+    transformed_df['zip_code'] = transformed_df['zip_code'].fillna(0).astype(int).astype(str).str.zfill(5).replace("00000", "Other")
+
+    #Handle Inconsistent Data
+    transformed_df = (transformed_df.fillna({"borough": "Other","contributing_factor_vehicle_1": "Other","contributing_factor_vehicle_2": "Other","vehicle_type_code1": "Other","vehicle_type_code2": "Other","cross_street_name": "Other","timestamp": "Other"}).replace(["Unspecified", "UNKNOWN", "NaN"], "Other"))
+    
+    #Cleaning Missing Value
+    transformed_df = transformed_df.dropna(subset=["latitude","longitude"])
 
     ti.xcom_push(key="transformed_data", value=transformed_df)
 
