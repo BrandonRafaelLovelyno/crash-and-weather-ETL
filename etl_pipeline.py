@@ -4,7 +4,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 from airflow.providers.mongo.hooks.mongo import MongoHook
+import logging
 
+logger = logging.getLogger(__name__)
 
 def get_response(url):
   response = requests.get(url)
@@ -13,16 +15,29 @@ def get_response(url):
   return response.json()
 
 def extract(ti, extraction_date):
+    print("::group::Extraction Logging Details")
+
     crash_url = f"https://data.cityofnewyork.us/resource/h9gi-nx95.json?$$app_token=cEo4SXjWrqXOCeN34pQxbQ8ZN&$query=SELECT * WHERE crash_date BETWEEN '{extraction_date}' AND '{extraction_date}' ORDER BY crash_date DESC LIMIT 10000"
     crash_df = pd.DataFrame(get_response(crash_url))
+    logger.info(f"Fetched {len(crash_df)} rows from crash data")
 
     weather_url = f"https://archive-api.open-meteo.com/v1/era5?latitude=40.730610&longitude=-73.935242&start_date={extraction_date}&end_date={extraction_date}&hourly=temperature_2m,precipitation"
     weather_df = pd.DataFrame(get_response(weather_url))
+    logger.info(f"Fetched {len(weather_df)} rows from weather data")
 
     ti.xcom_push(key="crash_data", value=crash_df)
+    print("crash_df head:", crash_df.head(5))
+    logger.info("Pushed crash_data to XCom")
+
     ti.xcom_push(key="weather_data", value=weather_df)
+    print("weather_df head:", weather_df.head(5))
+    logger.info("Pushed weather_data to XCom")
+
+    print("::endgroup::")
 
 def transform(ti):
+    print("::group::Transformation Logging Details")
+
     crash_df = ti.xcom_pull(key="crash_data", task_ids="extract_data")
     weather_df = ti.xcom_pull(key="weather_data", task_ids="extract_data")
 
@@ -66,18 +81,26 @@ def transform(ti):
 
     ti.xcom_push(key="transformed_data", value=transformed_df)
 
+    logger.info("Successfully transformed data")
+    print("::endgroup::")
+
 def load(ti):
+    print("::group::Load Logging Details")
+
     data = ti.xcom_pull(key="transformed_data", task_ids="transform_data")
-    print("Succesfully pulled data")
 
     hook = MongoHook(mongo_conn_id="mongo_crashdb")
     client = hook.get_conn()
     db = (client.data_engineering)
     crash_collection = db.crash_collection
-    print(f"Connected to MongoDB - {client.server_info()}")
+    logger.info(f"Connected to MongoDB - {client.server_info()}")
 
     data_dict = data.to_dict(orient='records')
     crash_collection.insert_many(data_dict)    
+
+    logger.info("Successfully load data to MongoDB")
+
+    print("::endgroup::")
 
 # Define DAG
 with DAG(
