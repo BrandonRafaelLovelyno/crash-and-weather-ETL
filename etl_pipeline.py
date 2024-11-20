@@ -21,8 +21,8 @@ def extract(ti, extraction_date):
     ti.xcom_push(key="weather_data", value=weather_df)
 
 def transform(ti):
-    crash_df = ti.xcom_pull(key="crash_data", task_ids="extract")
-    weather_df = ti.xcom_pull(key="weather_data", task_ids="extract")
+    crash_df = ti.xcom_pull(key="crash_data", task_ids="extract_data")
+    weather_df = ti.xcom_pull(key="weather_data", task_ids="extract_data")
     print("Extract Task:")
     print("crash_df", crash_df.head())
     print("weather_df", weather_df.head())
