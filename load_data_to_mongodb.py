@@ -7,7 +7,7 @@ from pendulum import datetime
 @dag(
     dag_id="load_data_to_mongodb",
     schedule=None,
-    start_date=datetime(2022,10,28)
+    start_date=datetime(2022,10,28),
     catchup=False,
     default_args={
         "retries": 0,
