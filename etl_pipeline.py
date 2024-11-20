@@ -104,7 +104,7 @@ def load(ti):
 
 # Define DAG
 with DAG(
-    'Crash and Weather Data ETL',
+    'crash_and_weather_data_ETL',
     default_args={'retries': 1},
     description='An ETL pipeline for crash and weather data',
     schedule_interval='@daily',
