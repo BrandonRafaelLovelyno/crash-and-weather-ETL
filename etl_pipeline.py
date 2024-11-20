@@ -3,6 +3,8 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import pandas as pd
 import requests
+from airflow.providers.mongo.hooks.mongo import MongoHook
+
 
 def get_response(url):
   response = requests.get(url)
@@ -65,8 +67,17 @@ def transform(ti):
     ti.xcom_push(key="transformed_data", value=transformed_df)
 
 def load(ti):
-    crash_df = ti.xcom_pull(key="transformed_data", task_ids="transform_data")
-    print(crash_df.head())
+    data = ti.xcom_pull(key="transformed_data", task_ids="transform_data")
+    print("Succesfully pulled data")
+
+    hook = MongoHook(mongo_conn_id="mongo_crashdb")
+    client = hook.get_conn()
+    db = (client.data_engineering)
+    crash_collection = db.crash_collection
+    print(f"Connected to MongoDB - {client.server_info()}")
+
+    data_dict = data.to_dict(orient='records')
+    crash_collection.insert_many(data_dict)    
 
 # Define DAG
 with DAG(
@@ -89,7 +100,7 @@ with DAG(
         python_callable=transform
     )
     load_task = PythonOperator(
-        task_id='load',
+        task_id='load_data',
         python_callable=load
     )
 
