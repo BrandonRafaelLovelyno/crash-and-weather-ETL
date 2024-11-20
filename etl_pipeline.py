@@ -108,14 +108,15 @@ with DAG(
     default_args={'retries': 1},
     description='An ETL pipeline for crash and weather data',
     schedule_interval='@daily',
-    start_date=datetime(2024, 9, 20),
+    start_date=datetime(2024, 11, 13),
     catchup=True,
 ) as dag:
     extract_task = PythonOperator(
         task_id='extract_data',
         python_callable=extract,
-        op_kwargs={
-            "extraction_date": (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
+         op_kwargs={
+            # Use Airflow's Jinja templating for ds (execution date) and calculate 7 days prior
+            "extraction_date": "{{ (execution_date - macros.timedelta(days=7)).strftime('%Y-%m-%d') }}",
         },
     )
     transform_task = PythonOperator(
