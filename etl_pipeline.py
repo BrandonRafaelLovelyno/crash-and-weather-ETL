@@ -94,7 +94,7 @@ def load(ti):
     hook = MongoHook(mongo_conn_id="mongo_crashdb")
     client = hook.get_conn()
     db = (client.data_engineering)
-    crash_collection = db.crash_collection
+    crash_collection = db.crash_collection_testing
     logger.info(f"Connected to MongoDB - {client.server_info()}")
 
     data_dict = data.to_dict(orient='records')
@@ -106,11 +106,11 @@ def load(ti):
 
 # Define DAG
 with DAG(
-    'crash_and_weather_data_ETL',
+    'testing_crash_and_weather_data_ETL',
     default_args={'retries': 1},
     description='An ETL pipeline for crash and weather data',
     schedule_interval='@daily',
-    start_date=datetime(2024, 10, 20),
+    start_date=datetime(2024, 11, 15),
     catchup=True,
 ) as dag:
     extract_task = PythonOperator(
