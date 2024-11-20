@@ -23,12 +23,42 @@ def extract(ti, extraction_date):
 def transform(ti):
     crash_df = ti.xcom_pull(key="crash_data", task_ids="extract_data")
     weather_df = ti.xcom_pull(key="weather_data", task_ids="extract_data")
-    print("Extract Task:")
-    print("crash_df", crash_df.head())
-    print("weather_df", weather_df.head())
 
-def load():
-    print("Loading data...")
+    time_weather_df = pd.DataFrame({
+        "time": pd.to_datetime(weather_df["hourly"]["time"]),
+        "temperature": pd.to_numeric(weather_df["hourly"]["temperature_2m"]),
+        "precipitation": pd.to_numeric(weather_df["hourly"]["precipitation"])
+    })
+
+    injured_mismatched_rows = crash_df[crash_df["number_of_persons_injured"].apply(pd.to_numeric) < crash_df[["number_of_pedestrians_injured", "number_of_cyclist_injured", "number_of_motorist_injured"]].apply(pd.to_numeric).sum(axis=1)]
+    assert len(injured_mismatched_rows) == 0, "Mismatch found in the sum of injured persons."
+
+    killed_mismatched_rows = crash_df[crash_df["number_of_persons_killed"].apply(pd.to_numeric) < crash_df[["number_of_pedestrians_killed", "number_of_cyclist_killed", "number_of_motorist_killed"]].apply(pd.to_numeric).sum(axis=1)]
+    assert len(killed_mismatched_rows) == 0, "Mismatch found in the sum of killed persons."
+
+    selected_columns = ["borough", "zip_code", "latitude", "longitude", "number_of_persons_injured", "number_of_persons_killed", "contributing_factor_vehicle_1", "contributing_factor_vehicle_2", "vehicle_type_code1", "vehicle_type_code2", "cross_street_name"]
+    cleaned_crash_df = crash_df.loc[:, selected_columns]
+    cleaned_crash_df["timestamp"] = pd.to_datetime(crash_df["crash_date"]) + pd.to_timedelta(crash_df["crash_time"] + ":00")
+    cleaned_crash_df = cleaned_crash_df.replace(["Unspecified", "UNKNOWN", "NaN"], np.nan)
+
+    numeric_columns = ["latitude", "longitude", "number_of_persons_injured", "number_of_persons_killed"]
+    cleaned_crash_df[numeric_columns] = cleaned_crash_df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
+    sorted_crash_df = cleaned_crash_df.sort_values("timestamp")
+
+    transformed_df = pd.merge_asof(
+        sorted_crash_df,
+        time_weather_df,
+        left_on="timestamp",
+        right_on="time",
+        direction="backward"  # Ensures we match the latest 'time' <= 'timestamp'
+    )
+
+    ti.xcom_push(key="transformed_data", value=transformed_df)
+
+def load(ti):
+    crash_df = ti.xcom_pull(key="transformed_data", task_ids="transform_data")
+    print(crash_df.head())
 
 # Define DAG
 with DAG(
@@ -50,6 +80,9 @@ with DAG(
         task_id='transform_data',
         python_callable=transform
     )
-    # load_task = PythonOperator(task_id='load', python_callable=load)
+    load_task = PythonOperator(
+        task_id='load',
+        python_callable=load
+    )
 
-    extract_task >> transform_task
+    extract_task >> transform_task >> load_task
