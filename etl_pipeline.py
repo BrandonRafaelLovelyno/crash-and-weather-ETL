@@ -104,12 +104,12 @@ def load(ti):
 
 # Define DAG
 with DAG(
-    'testing_etl_pipeline',
+    'Crash and Weather Data ETL',
     default_args={'retries': 1},
-    description='A simple ETL pipeline',
+    description='An ETL pipeline for crash and weather data',
     schedule_interval='@daily',
-    start_date=datetime(2023, 1, 1),
-    catchup=False,
+    start_date=datetime(2024, 9, 20),
+    catchup=True,
 ) as dag:
     extract_task = PythonOperator(
         task_id='extract_data',
